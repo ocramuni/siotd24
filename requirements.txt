@@ -1,0 +1,9 @@
+adafruit-circuitpython-dht==4.0.7
+adafruit-python-shell==1.8.1
+influxdb==5.3.2
+ncnn==1.0.20241226
+opencv-python==4.11.0.86
+python-dotenv==1.0.1
+python-telegram-bot==21.10
+picamera2==0.3.24
+ultralytics==8.3.70
