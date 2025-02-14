@@ -13,14 +13,24 @@ MAX_TEMP=int(utils.read_config('temperature', 'Max'))
 MIN_TEMP=int(utils.read_config('temperature', 'Min'))
 
 # Get Led pin
-RED=int(utils.read_config('led','Red'))
-GREEN=int(utils.read_config('led','Green'))
-YELLOW=int(utils.read_config('led','Yellow'))
+RED_PIN=int(utils.read_config('led', 'Red'))
+GREEN_PIN=int(utils.read_config('led', 'Green'))
+YELLOW_PIN=int(utils.read_config('led', 'Yellow'))
 
 # Get Sensor pin
 SENSOR_PIN = utils.read_config('sensor', 'Pin')
 
-offset = [0]
+# Interval and timeout settings
+DETECTION_TIMEOUT = int(utils.read_config('camera','DetectionTimeout'))
+DETECTION_INTERVAL = int(utils.read_config('camera','DetectionInterval'))
+MEASUREMENT_INTERVAL = int(utils.read_config('sensor','MeasurementInterval'))
+
+# offset, minimum temperature, maximum temperature
+temperature = {
+	'offset': 0,
+	'min': MIN_TEMP,
+	'max': MAX_TEMP,
+}
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -41,7 +51,7 @@ async def camera_task(application, my_camera):
     alert_led = application.bot_data['alert_led']
     people_led = application.bot_data['people_led']
     count = 0
-    while count < 60:
+    while count < DETECTION_TIMEOUT:
         picture, humans = my_camera.get_picture()
         if humans > 0:
             logging.debug(f"Number of humans: {humans}")
@@ -50,10 +60,11 @@ async def camera_task(application, my_camera):
             return True
         else:
             people_led.off()
-        await asyncio.sleep(10)
-        count += 10
+        await asyncio.sleep(DETECTION_INTERVAL)
+        count += DETECTION_INTERVAL
     logging.info(f"No people in the room for {count}s")
     alert_led.on()
+    await utils.send_message(application, f"ALERT: no people in room {ROOM}.")
     return False
 
 
@@ -63,6 +74,7 @@ async def sensor_task(application, warning_led, my_sensor, my_camera, influxdb):
     """
     await utils.send_message(application, f"Starting monitoring temperature in room {ROOM}")
     my_camera_task = None
+    out_of_range = False
     alert_led = application.bot_data['alert_led']
     people_led = application.bot_data['people_led']
     try:
@@ -71,10 +83,13 @@ async def sensor_task(application, warning_led, my_sensor, my_camera, influxdb):
             my_temperature = my_sensor.read('temperature')
             my_humidity = my_sensor.read('humidity')
             if my_humidity is not None and my_temperature is not None:
-                my_temperature += offset[0]
+                my_temperature += temperature['offset']
                 write_data_to_db(influxdb, my_humidity, my_temperature)
-                if my_temperature < MIN_TEMP or my_temperature > MAX_TEMP:
-                    logging.info('Temperature is out of range.')
+                if my_temperature < temperature['min'] or my_temperature > temperature['max']:
+                    if not out_of_range:
+                        logging.info('Temperature is out of range.')
+                        await utils.send_message(application, f"WARNING: temperature in room {ROOM} is out of range.")
+                        out_of_range = True
                     warning_led.on()
                     if my_camera_task is None or my_camera_task.done():
                         logging.info('Starting camera task')
@@ -86,10 +101,13 @@ async def sensor_task(application, warning_led, my_sensor, my_camera, influxdb):
                     if my_camera_task is not None:
                         logging.info('Cancel camera task')
                         my_camera_task.cancel()
-                        #my_camera_task = None
-                    logging.info('Temperature is back to normal')
-            await asyncio.sleep(10)
+                    if out_of_range:
+                        logging.info('Temperature is back to normal')
+                        await utils.send_message(application, f"Temperature in room {ROOM} is back to normal.")
+                        out_of_range = False
+            await asyncio.sleep(MEASUREMENT_INTERVAL)
     except asyncio.CancelledError as e:
+        logging.error(e)
         warning_led.shutdown()
 
 
@@ -98,9 +116,9 @@ async def main():
     This is the main coroutine that creates and runs several subtasks in parallel.
     """
     # Configure GPIO
-    warning_led = led.Led(YELLOW)
-    alert_led = led.Led(RED)
-    people_led = led.Led(GREEN)
+    warning_led = led.Led(YELLOW_PIN)
+    alert_led = led.Led(RED_PIN)
+    people_led = led.Led(GREEN_PIN)
 
     # Init external hardware
     my_camera = camera.Camera()
@@ -108,7 +126,7 @@ async def main():
     influxdb = db.DB()
 
     # Init Telegram Bot
-    my_telegrambot = telegrambot.TelegramBot(my_camera, warning_led, my_sensor, offset)
+    my_telegrambot = telegrambot.TelegramBot(my_camera, warning_led, my_sensor, temperature)
     application = my_telegrambot.application
     application.bot_data['room'] = ROOM
     application.bot_data['alert_led'] = alert_led
@@ -116,6 +134,8 @@ async def main():
 
     await application.initialize()
     await application.start()
+    # change the list of the bot’s commands
+    await telegrambot.set_command(application)
     await application.updater.start_polling()
     await application.create_task(sensor_task(application, warning_led, my_sensor, my_camera, influxdb))
 
