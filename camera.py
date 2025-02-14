@@ -2,17 +2,20 @@ import libcamera
 from picamera2 import Picamera2
 from ultralytics import YOLO
 
+import utils
+
 class Camera:
     def __init__(self):
+        # Get configuration
+        camera_model = utils.read_config('camera', 'Model')
+        output_width = int(utils.read_config('camera', 'OutputSizeWidth'))
+        output_height = int(utils.read_config('camera', 'OutputSizeHeight'))
         # Start-up camera
-        tuning = Picamera2.load_tuning_file("imx219_noir.json", dir='/usr/share/libcamera/ipa/rpi/vc4/')
+        tuning = Picamera2.load_tuning_file(f"{camera_model}_noir.json", dir='/usr/share/libcamera/ipa/rpi/vc4/')
         self.camera = Picamera2(tuning=tuning)
-        # no crop settings
-        # (3280, 2464) low brightness
-        # (1640, 1232) best setting
         camera_config = self.camera.create_still_configuration(
             main={'format': "RGB888", 'size': (1280, 720)},
-            sensor={'output_size': (1640, 1232), 'bit_depth': 10},
+            sensor={'output_size': (output_width, output_height), 'bit_depth': 10},
             controls={
                 "AwbEnable": True,
                 "AwbMode": libcamera.controls.AwbModeEnum.Auto,
