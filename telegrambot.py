@@ -1,7 +1,7 @@
 import cv2
 import os
-from telegram import Update
-from telegram.ext import Application, ContextTypes, CommandHandler
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
+from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
 
 from dotenv import load_dotenv
 
@@ -26,8 +26,10 @@ class TelegramBot:
         self.my_sensor = my_sensor
         self.temperature = temperature # temperature dictionary passed by reference
 
-        start_handler = CommandHandler(['start','help'], self.get_start)
+        start_handler = CommandHandler(['start','help'], self.start)
+        start_message_handler = MessageHandler(filters.TEXT & (~ filters.COMMAND), self.start_message)
         self.application.add_handler(start_handler)
+        self.application.add_handler(start_message_handler)
 
         get_picture_handler = CommandHandler('picture', self.get_picture)
         self.application.add_handler(get_picture_handler)
@@ -47,10 +49,21 @@ class TelegramBot:
         set_minimum_handler = CommandHandler('minimum', self.set_minimum)
         self.application.add_handler(set_minimum_handler)
 
-    async def get_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        buttons = [[KeyboardButton('Temperature'), KeyboardButton('People')],
+                   [KeyboardButton('Picture')]]
         room = context.bot_data['room']
         await context.bot.send_message(chat_id=update.effective_chat.id,
-                                       text=f"I'm monitoring temperature in room {room}")
+                                       text=f"I'm monitoring temperature in room {room}",
+                                       reply_markup=ReplyKeyboardMarkup(buttons))
+
+    async def start_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if 'Temperature' in update.message.text:
+            await self.get_temperature(update, context)
+        elif 'People' in update.message.text:
+            await self.get_people(update, context)
+        elif 'Picture' in update.message.text:
+            await self.get_picture(update, context)
 
     def _to_bytes(self, image):
         is_success, im_buf_arr = cv2.imencode(".jpg", image)

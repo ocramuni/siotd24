@@ -134,7 +134,7 @@ async def main():
 
     await application.initialize()
     await application.start()
-    # change the list of the bot’s commands
+    # change the list of the bot's commands
     await telegrambot.set_command(application)
     await application.updater.start_polling()
     await application.create_task(sensor_task(application, warning_led, my_sensor, my_camera, influxdb))
