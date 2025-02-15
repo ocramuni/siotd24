@@ -24,6 +24,13 @@ sudo -E env PATH=$PATH python3 raspi-blinka.py
 ## Configuration
 Copy `.env.dist` to `.env` and add Telegram and InfluxDB connection parameters.
 
+To get `TELEGRAM_CHAT_ID` run:
+```shell
+source siotd24/bin/activate
+python3 chat_id.py
+```
+and send '/hello' to TelegramBot.
+
 Start InfluxDB container:
 ```shell
 docker compose up -d
