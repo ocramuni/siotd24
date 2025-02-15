@@ -170,48 +170,4 @@ Inoltre, nonostante le ridotte risorse computazionali del Raspberry Pi e la qual
 Data la semplicità e il basso costo di realizzazione, il progetto può essere utilizzato per monitorare la temperatura di tutte le stanze all'interno di un edificio.
 La possibilità di visualizzare le temperature in tempo reale, tramite una dashboard Grafana, e il rilevamento delle persone sono un aiuto importante nella valutazione delle azioni da intraprendere per ridurre i consumi energetici, identificando le stanze vuote con temperature anomale.
 
-\appendices
-\noindent{\huge\bfseries APPENDICE\par}
-
-\section{Docker Compose}
-\begin{lstlisting}[caption=docker-compose.yaml]
-services:
-  influxdb:
-    image: influxdb:1.8
-    environment:
-      - TZ=Europe/Rome
-      - INFLUXDB_DB=defaultdb
-      - INFLUXDB_ADMIN_ENABLED=true
-      - INFLUXDB_ADMIN_USER=admin
-      - INFLUXDB_ADMIN_PASSWORD=adminpass
-      - INFLUXDB_USER=user
-      - INFLUXDB_USER_PASSWORD=userpass
-    ports:
-      - "8086:8086"
-    networks:
-      - iot
-    volumes:
-      - influxdb:/var/lib/influxdb
-    restart: always
-
-  grafana:
-    image: grafana/grafana:8.4.6-ubuntu
-    ports:
-      - "3000:3000"
-    networks:
-      - iot
-    volumes:
-      - grafana:/var/lib/grafana
-    depends_on:
-      - influxdb
-    restart: always
-
-  networks:
-    iot:
-
-  volumes:
-    influxdb:
-    grafana:
-\end{lstlisting}
-
 \end{document}
